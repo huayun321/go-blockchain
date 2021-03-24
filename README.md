@@ -1,2 +1,2 @@
 # go-blockchain
-ga simple block chain
+a simple block chain
