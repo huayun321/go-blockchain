@@ -1,2 +1,2 @@
 # go-blockchain
-go implement a simple block chain
+ga simple block chain
