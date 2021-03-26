@@ -4,61 +4,70 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
-	"os"
-	"strconv"
+	"log"
 	"time"
 )
 
+// Block keeps block headers
 type Block struct {
-	Timestamp     int64  //当前时间戳 区块创建时间
-	Data          []byte //前一个块的哈希，即父哈希
-	PrevBlockHash []byte //当前块的哈希
-	Hash          []byte //区块存储的实际有效信息，也就是交易
-	Nonce         int    //用来生成hash的计数器值
+	Timestamp     int64
+	Transactions  []*Transaction
+	PrevBlockHash []byte
+	Hash          []byte
+	Nonce         int
 }
 
-func (b *Block) SetHash() {
-	timestamp := []byte(strconv.FormatInt(b.Timestamp, 10))
-	headers := bytes.Join([][]byte{b.PrevBlockHash, b.Data, timestamp}, []byte{})
-	hash := sha256.Sum256(headers)
-
-	b.Hash = hash[:]
-}
-
-func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
-	pow := NewProofOfWork(block)
-	nonce, hash := pow.Run()
-
-	block.Hash = hash
-	block.Nonce = nonce
-
-	return block
-}
-
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
-}
-
+// Serialize serializes the block
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
 
 	err := encoder.Encode(b)
 	if err != nil {
-		os.Exit(-1)
+		log.Panic(err)
 	}
 
 	return result.Bytes()
 }
 
+// HashTransactions returns a hash of the transactions in the block
+func (b *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
+
+	for _, tx := range b.Transactions {
+		txHashes = append(txHashes, tx.ID)
+	}
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+
+	return txHash[:]
+}
+
+// NewBlock creates and returns Block
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0}
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+
+	block.Hash = hash[:]
+	block.Nonce = nonce
+
+	return block
+}
+
+// NewGenesisBlock creates and returns genesis Block
+func NewGenesisBlock(coinbase *Transaction) *Block {
+	return NewBlock([]*Transaction{coinbase}, []byte{})
+}
+
+// DeserializeBlock deserializes a block
 func DeserializeBlock(d []byte) *Block {
 	var block Block
 
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&block)
 	if err != nil {
-		os.Exit(-1)
+		log.Panic(err)
 	}
 
 	return &block
